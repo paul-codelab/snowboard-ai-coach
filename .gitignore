@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+out/
+runs/
+*.task
+*.tflite
+*.pt
+.venv/
+models/
+# 自己的影片放在根目錄測試即可，不會被提交
+/*.mp4
+/*.MP4
+/*.mov
+/*.MOV
+Sample/

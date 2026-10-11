@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snowcoach"
+version = "0.1.0"
+description = "單板滑雪動作影片分析：姿勢偵測、板子座標指標、中文教練建議"
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "Paul (paul-codelab)" }]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "opencv-python-headless>=4.8",
+    "pillow>=10",
+    "mediapipe>=0.10.14",
+]
+
+[project.optional-dependencies]
+# Ultralytics 為 AGPL-3.0；只在需要 YOLO 後端時安裝
+yolo = ["ultralytics>=8.3"]
+# 圖形介面（本機網頁）
+gui = ["gradio>=5", "imageio-ffmpeg>=0.5"]
+# 輸出 H.264 影片（手機/瀏覽器可直接播放）
+h264 = ["imageio-ffmpeg>=0.5"]
+dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/paul-codelab/snowboard-ai-coach"
+Issues = "https://github.com/paul-codelab/snowboard-ai-coach/issues"
+
+[project.scripts]
+snowcoach = "snowcoach.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["snowcoach*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: 需要模型檔（會自動下載）的整合測試"]

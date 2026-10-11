@@ -1,0 +1,71 @@
+# 在真正的 macOS 與 Windows 上測試一鍵安裝腳本：從零安裝 → 下載模型 → 分析一小段合成影片
+name: 一鍵安裝腳本
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "start-mac.command"
+      - "start-windows.bat"
+      - "pyproject.toml"
+      - "snowcoach/**"
+      - ".github/make_test_clip.py"
+      - ".github/workflows/launchers.yml"
+  pull_request:
+    paths:
+      - "start-mac.command"
+      - "start-windows.bat"
+      - "pyproject.toml"
+      - "snowcoach/**"
+      - ".github/make_test_clip.py"
+      - ".github/workflows/launchers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: 執行 start-mac.command（安裝與檢查）
+        run: bash start-mac.command --check
+      - name: 第二次執行不應重新安裝
+        run: |
+          out="$(bash start-mac.command --check)"
+          echo "$out"
+          if echo "$out" | grep -q "安裝 Python"; then echo "不應重新安裝"; exit 1; fi
+      - name: 用安裝好的環境分析一小段合成影片
+        env:
+          SNOWCOACH_MODELS: ${{ github.workspace }}/models
+          GLOG_minloglevel: "2"
+        run: |
+          .venv/bin/python .github/make_test_clip.py ci.mp4
+          .venv/bin/snowcoach analyze ci.mp4 -o out/ci
+          ls out/ci
+          test -f out/ci/report.html && test -f out/ci/overlay.mp4
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: 執行 start-windows.bat（安裝與檢查）
+        shell: cmd
+        run: start-windows.bat --check
+      - name: 用安裝好的環境分析一小段合成影片
+        shell: cmd
+        env:
+          SNOWCOACH_MODELS: ${{ github.workspace }}\models
+          GLOG_minloglevel: "2"
+          PYTHONUTF8: "1"
+        run: |
+          .venv\Scripts\python.exe .github\make_test_clip.py ci.mp4
+          if errorlevel 1 exit /b 1
+          .venv\Scripts\snowcoach.exe analyze ci.mp4 -o out\ci
+          if errorlevel 1 exit /b 1
+          dir out\ci
+          if not exist out\ci\report.html exit /b 1
+          if not exist out\ci\overlay.mp4 exit /b 1

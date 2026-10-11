@@ -1,0 +1,123 @@
+# 在 GitHub 上分析 repo 裡的一支影片：
+# Actions 分頁 → 「分析影片」→ Run workflow → 填入影片檔名與選項。
+# 完成後在執行頁面下方下載結果（report.html、疊圖影片、CSV），摘要也會直接顯示在執行頁面上。
+name: 分析影片
+
+on:
+  workflow_dispatch:
+    inputs:
+      video:
+        description: "影片在 repo 中的路徑（例如 samples/我的影片.mp4）"
+        required: true
+        type: string
+      level:
+        description: "程度"
+        type: choice
+        options: [beginner, intermediate, advanced]
+        default: intermediate
+      stance:
+        description: "慣用站姿（regular = 左腳在前，goofy = 右腳在前）"
+        type: choice
+        options: [auto, regular, goofy]
+        default: auto
+      source:
+        description: "拍攝方式（selfie = 自拍，follow = 別人拍）"
+        type: choice
+        options: [auto, selfie, follow]
+        default: auto
+      detector:
+        description: "找人用的偵測器（騎手很小時可選 yolo，安裝較久）"
+        type: choice
+        options: [mediapipe, yolo]
+        default: mediapipe
+      start:
+        description: "從第幾秒開始（空白 = 開頭）"
+        type: string
+        default: ""
+      end:
+        description: "到第幾秒結束（空白 = 結尾）"
+        type: string
+        default: ""
+      make_video:
+        description: "產生疊圖影片"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: 安裝系統套件
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libegl1 libgles2 fonts-noto-cjk
+
+      - name: 快取模型檔
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/snowcoach
+          key: snowcoach-models-v1
+
+      - name: 安裝 snowcoach
+        env:
+          DETECTOR: ${{ inputs.detector }}
+        run: |
+          if [ "$DETECTOR" = "yolo" ]; then
+            # 先裝 CPU 版 torch，避免下載約 2GB 的 GPU 版
+            pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+            pip install -e ".[h264,yolo]"
+          else
+            pip install -e ".[h264]"
+          fi
+
+      # 輸入值一律經由環境變數傳入，不直接嵌進指令（避免指令注入）
+      - name: 分析
+        env:
+          GLOG_minloglevel: "2"
+          VIDEO: ${{ inputs.video }}
+          LEVEL: ${{ inputs.level }}
+          STANCE: ${{ inputs.stance }}
+          SOURCE: ${{ inputs.source }}
+          DETECTOR: ${{ inputs.detector }}
+          START: ${{ inputs.start }}
+          END: ${{ inputs.end }}
+          MAKE_VIDEO: ${{ inputs.make_video }}
+        run: |
+          if [ ! -f "$VIDEO" ]; then
+            echo "::error::找不到影片：$VIDEO（請填 repo 中的路徑，例如 samples/xxx.mp4）"
+            exit 1
+          fi
+          args=(analyze "$VIDEO" -o out/result --level "$LEVEL" --stance "$STANCE" --source "$SOURCE" --detector "$DETECTOR")
+          if [ -n "$START" ]; then args+=(--start "$START"); fi
+          if [ -n "$END" ]; then args+=(--end "$END"); fi
+          if [ "$MAKE_VIDEO" != "true" ]; then args+=(--no-video); fi
+          snowcoach "${args[@]}"
+
+      - name: 在執行頁面顯示摘要
+        if: always()
+        run: |
+          if [ -f out/result/report.md ]; then
+            cat out/result/report.md >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "完整結果（report.html、疊圖影片、CSV）請在本頁下方的 Artifacts 下載。" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: 上傳結果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snowcoach-結果-${{ github.run_number }}
+          path: out/result/
+          if-no-files-found: warn
+          retention-days: 30

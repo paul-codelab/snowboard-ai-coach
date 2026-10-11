@@ -1,0 +1,17 @@
+{
+  // GitHub Codespaces：在瀏覽器中開一台雲端電腦，自動安裝好 snowcoach 並開啟圖形介面
+  "name": "snowcoach",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11-bookworm",
+  "hostRequirements": { "cpus": 2, "memory": "8gb" },
+  "postCreateCommand": "sudo apt-get update -q && sudo apt-get install -y -q libegl1 libgles2 fonts-noto-cjk && pip install -e '.[gui,h264,dev]'",
+  "postAttachCommand": {
+    "gui": "echo '啟動 snowcoach 圖形介面……瀏覽器會自動開新分頁（若沒有，請到「連接埠」分頁點 7860）' && GLOG_minloglevel=2 snowcoach gui --no-browser"
+  },
+  "forwardPorts": [7860],
+  "portsAttributes": {
+    "7860": { "label": "snowcoach 圖形介面", "onAutoForward": "openBrowser" }
+  },
+  "customizations": {
+    "codespaces": { "openFiles": ["README.md"] }
+  }
+}

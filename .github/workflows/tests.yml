@@ -1,0 +1,41 @@
+# 每次推送到 main、或 PR 有更新時自動跑測試（含用合成影片跑完整流程的整合測試）
+name: 測試
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: 安裝系統套件（MediaPipe 需要的 EGL、中文字型）
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libegl1 libgles2 fonts-noto-cjk
+
+      - name: 快取模型檔
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/snowcoach
+          key: snowcoach-models-v1
+
+      - name: 安裝 snowcoach
+        run: pip install -e ".[dev,h264,gui]"
+
+      - name: 執行測試
+        env:
+          GLOG_minloglevel: "2"
+        run: pytest -q
